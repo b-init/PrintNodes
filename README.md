@@ -33,7 +33,7 @@ Changelog
 **v1.0.0 (28th Apr, 21)** 
 	* Initial release. 
 **v1.1.0 (1st May, 21)**
-	* Added option to disable the auto-crop feature (in Preferences) which may cause very particular problems.
+	* Added option to disable the auto-crop feature (in Preferences) as it could cause very particular problems.
 
 
 Additional Info
