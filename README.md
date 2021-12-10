@@ -26,7 +26,7 @@ Notes
 * It is recommended to save the blend file before using the addon.
 * Selecting `NodeFrames` while using `Take Screenshot Of Selected Nodes` Feature will crash the application. Keep that in mind.
 * Works on Linux and Mac only for Blender 2.93 or above (but for all blender versions on Windows)
-* For Blender 3.0 or above, a custom build of blender  (along with PrintNodes v1.1.4) is required which has been uploaded [here](https://github.com/Yeetus3141/PrintNodes/releases/tag/v1.1.4). 
+* For **Blender 3.0 or above**, a custom build of blender  (along with PrintNodes v1.1.4) is required which has been uploaded [here](https://github.com/Yeetus3141/PrintNodes/releases/tag/v1.1.4). 
 
 
 Additional Info
