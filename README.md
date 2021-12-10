@@ -2,7 +2,7 @@
 ==
 
 Blender addon to take high quality screenshots of node trees irrespective of the display resolution.
-Works with blender 2.80 and above.
+Works with blender 2.80 and above.  (Does **NOT** natively support Blender 3.0+ for now. But workaround is provided in **Notes** section)
 
 __*Please read the Usage and Notes section before using the addon*__
 
@@ -25,12 +25,8 @@ Notes
 * Can take shots of whole node tree, within node groups, or only the selected nodes (using the `Take Screenshot Of Selected Nodes` option.)
 * It is recommended to save the blend file before using the addon.
 * Selecting `NodeFrames` while using `Take Screenshot Of Selected Nodes` Feature will crash the application. Keep that in mind.
-
-
-Changelog
---
-**v1.0.0 (28th Apr, 21)** 
-	* Initial release. 
+* Works on Linux and Mac only for Blender 2.93 or above (but for all blender versions on Windows)
+* For Blender 3.0 or above, a custom build of blender  (along with PrintNodes v1.1.4) is required which has been uploaded [here](https://github.com/Yeetus3141/PrintNodes/releases/tag/v1.1.4). 
 
 
 Additional Info
