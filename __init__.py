@@ -19,8 +19,8 @@ bl_info = {
     "name" : "PrintNodes",
     "author" : "Binit",
     "description" : "Takes high quality screenshot of a node tree",
-    "blender" : (2, 80, 0),
-    "version" : (1, 0, 0),
+    "blender" : (3, 00, 0),
+    "version" : (1, 1, 4),
     "location" : "Node Editor > Context Menu (Right Click)",
     "warning" : "",
     "category" : "Node"
@@ -32,8 +32,19 @@ from bpy.props import StringProperty, BoolProperty, IntProperty
 
 import time
 import os
-from .PIL import Image, ImageChops
+import sys
 
+
+if sys.platform == "win32":
+    from .PIL_win.PIL import Image, ImageChops
+elif sys.platform == "linux":
+    from .PIL_linux.PIL import Image, ImageChops
+elif sys.platform == "darwin":
+    from .PIL_darwin.PIL import Image, ImageChops
+else:
+    raise RuntimeError(f"Unsupported platform '{sys.platform}'.")
+
+Image.MAX_IMAGE_PIXELS = None # disable max resolution limit from PIL. Comes in the way of screenshotting abnormally huge trees
 
 def MakeDirectory(): # Manage Directory for saving screenshots
 
@@ -70,15 +81,22 @@ class PRTND_PT_Preferences(AddonPreferences): # setting up perferences
         default = 30,
         )
 
+    disable_auto_crop: BoolProperty(
+        name = 'Disable Auto Cropping',
+        description = 'Check this if something is not working properly',
+        default = False,
+        )
+
     def draw(self, context):
         layout = self.layout
         layout.label(text = "A subfolder in the same directory as the blend file will be used to save the images.")
         layout.label(text = "Unless the file is unsaved or 'Always Use Secondary Directory' is checked.")
-        layout.label(text = "In whcich case, the Secondary Directory will be used")
+        layout.label(text = "In which case, the Secondary Directory will be used")
         layout.prop(self, "secondary_save_dir")
         layout.prop(self, "force_secondary_dir")
         layout.separator()
         layout.prop(self, "padding_amount")
+        layout.prop(self, "disable_auto_crop")
 
 
 class PRTND_MT_ContextMenu(Menu): 
@@ -130,7 +148,7 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
             dy = area.height - 1
             
             path = os.path.join(MakeDirectory(), f'Prt_y{self.iy}_x{self.ix}.png')
-            bpy.ops.screen.screenshot(filepath=path, full = False) # take screenshot of current view as a 'tile' to be further stitched and processed
+            bpy.ops.screen.screenshot_area(filepath=path) # take screenshot of current view as a 'tile' to be further stitched and processed
 
             if tree.view_center[1] > self.Ymax and tree.view_center[0] > self.Xmax: # check if already at the other corner of the tree, if yes, sucessfully terminate
                 self.cancel(context)
@@ -148,11 +166,6 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         return {'PASS_THROUGH'} # pass for next iteration
 
     def execute(self, context):
-        
-        invisible_ascii_char = '⠀' # magically invisible ascii character for super secret reasons (which is, so that the material label on the screen doesn't appear and mess up the shot)
-
-        self.temp_name = context.space_data.id.name
-        context.space_data.id.name = invisible_ascii_char
 
         self.temp_grid_level = context.preferences.themes[0].node_editor.grid_levels
         bpy.context.preferences.themes[0].node_editor.grid_levels = 0 # turn gridlines off, trimming empty space doesn't work otherwise
@@ -181,16 +194,28 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
                 self.Xmax = locX
             if locY > self.Ymax:
                 self.Ymax = locY
-            
-        node = tree.nodes.new("NodeReroute") # new reroute node as guide for the algorithm to work
-        node.location = self.Xmin, self.Ymin
 
+        # co-ords from node.location and tree.view_center are apparently not the same (you could say they don't co-ordinate, haha ha...) so I have to make sure I'm using the right ones 
+        node = tree.nodes.new("NodeReroute")
+        node.location = self.Xmax, self.Ymax
         for current_node in nodes:
             current_node.select = False
-        
         node.select = True
-        bpy.ops.wm.redraw_timer(iterations=1) # Force Updates 2dview so that the ndoe location gets updated. this one ugly line makes the whole addone uncompatible for being an official addon, may find a workaround later. But gotta live with it for now
-        bpy.ops.node.view_selected() # align view to the (bottom-left) corner node. As an initial point for the screenshotting process
+        bpy.ops.wm.redraw_timer(iterations=1)
+        bpy.ops.node.view_selected()
+        bpy.ops.wm.redraw_timer(iterations=1)
+        self.Xmax, self.Ymax = tree.view_center
+
+        node = tree.nodes.new("NodeReroute")
+        node.location = self.Xmin, self.Ymin
+        for current_node in nodes:
+            current_node.select = False
+        node.select = True
+        bpy.ops.wm.redraw_timer(iterations=1)
+        bpy.ops.node.view_selected() # also align view to the (bottom-left) corner node. As an initial point for the screenshotting process
+        bpy.ops.wm.redraw_timer(iterations=1)
+        self.Xmin, self.Ymin = tree.view_center
+
         
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.02, window=context.window) # add timer to begin with, for the `modal` process
@@ -210,7 +235,6 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
 
         # revert all the temporary settings back to original
         context.preferences.themes[0].node_editor.grid_levels = self.temp_grid_level
-        context.space_data.id.name = self.temp_name
 
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
@@ -254,7 +278,8 @@ def StitchTiles(tile_width, tile_height, num_x, num_y): # function to stitch mul
             out_canvas.paste(current_tile, (tile_width * x, tile_height * (num_y - (y + 1))))
             os.remove(tile_path) #remove used tiles
 
-    out_canvas = TrimImage(out_canvas)
+    if not bpy.context.preferences.addons[__name__].preferences.disable_auto_crop:
+        out_canvas = TrimImage(out_canvas)
 
     timestamp = time.strftime("%y%m%d-%H%M%S")
     out_path = os.path.join(folder_path, f'NodeTreeShot{timestamp}.png')

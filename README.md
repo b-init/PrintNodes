@@ -25,16 +25,12 @@ Notes
 * Can take shots of whole node tree, within node groups, or only the selected nodes (using the `Take Screenshot Of Selected Nodes` option.)
 * It is recommended to save the blend file before using the addon.
 * Selecting `NodeFrames` while using `Take Screenshot Of Selected Nodes` Feature will crash the application. Keep that in mind.
-* If you're facing weird issues with the final Image, try disabling the auto-crop feature from preferences.
 
 
 Changelog
 --
 **v1.0.0 (28th Apr, 21)** 
 	* Initial release. 
-
-**v1.1.0 (1st May, 21)**
-	* Added option to disable the auto-crop feature (in Preferences) as it could cause very particular problems.
 
 
 Additional Info
