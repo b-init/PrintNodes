@@ -205,6 +205,8 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         bpy.ops.node.view_selected()
         bpy.ops.wm.redraw_timer(iterations=1)
         self.Xmax, self.Ymax = tree.view_center
+        # Remove reroute node from graph, so that it does not appear in the final image
+        tree.nodes.remove(node)
 
         node = tree.nodes.new("NodeReroute")
         node.location = self.Xmin, self.Ymin
@@ -215,6 +217,8 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         bpy.ops.node.view_selected() # also align view to the (bottom-left) corner node. As an initial point for the screenshotting process
         bpy.ops.wm.redraw_timer(iterations=1)
         self.Xmin, self.Ymin = tree.view_center
+        # Remove reroute node from graph, so that it does not appear in the final image
+        tree.nodes.remove(node)
 
         
         wm = context.window_manager
