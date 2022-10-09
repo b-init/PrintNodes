@@ -66,13 +66,13 @@ class PcxImageFile(ImageFile.ImageFile):
         version = s[1]
         bits = s[3]
         planes = s[65]
-        ignored_stride = i16(s, 66)
+        provided_stride = i16(s, 66)
         logger.debug(
             "PCX version %s, bits %s, planes %s, stride %s",
             version,
             bits,
             planes,
-            ignored_stride,
+            provided_stride,
         )
 
         self.info["dpi"] = i16(s, 12), i16(s, 14)
@@ -110,10 +110,15 @@ class PcxImageFile(ImageFile.ImageFile):
         self.mode = mode
         self._size = bbox[2] - bbox[0], bbox[3] - bbox[1]
 
-        # don't trust the passed in stride. Calculate for ourselves.
-        # CVE-2020-35655
+        # Don't trust the passed in stride.
+        # Calculate the approximate position for ourselves.
+        # CVE-2020-35653
         stride = (self._size[0] * bits + 7) // 8
-        stride += stride % 2
+
+        # While the specification states that this must be even,
+        # not all images follow this
+        if provided_stride != stride:
+            stride += stride % 2
 
         bbox = (0, 0) + self.size
         logger.debug("size: %sx%s", *self.size)
@@ -193,7 +198,9 @@ def _save(im, fp, filename):
     if im.mode == "P":
         # colour palette
         fp.write(o8(12))
-        fp.write(im.im.getpalette("RGB", "RGB"))  # 768 bytes
+        palette = im.im.getpalette("RGB", "RGB")
+        palette += b"\x00" * (768 - len(palette))
+        fp.write(palette)  # 768 bytes
     elif im.mode == "L":
         # greyscale palette
         fp.write(o8(12))

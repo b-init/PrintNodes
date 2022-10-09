@@ -22,6 +22,7 @@ from . import Image, ImageFile, ImagePalette
 from ._binary import i8
 from ._binary import i16be as i16
 from ._binary import i32be as i32
+from ._binary import si16be as si16
 
 MODES = {
     # (photoshop mode, bits) -> (pil mode, required channels)
@@ -131,7 +132,7 @@ class PsdImageFile(ImageFile.ImageFile):
         self.tile = _maketile(self.fp, mode, (0, 0) + self.size, channels)
 
         # keep the file open
-        self.__fp = self.fp
+        self._fp = self.fp
         self.frame = 1
         self._min_frame = 1
 
@@ -145,7 +146,7 @@ class PsdImageFile(ImageFile.ImageFile):
             self.mode = mode
             self.tile = tile
             self.frame = layer
-            self.fp = self.__fp
+            self.fp = self._fp
             return name, bbox
         except IndexError as e:
             raise EOFError("no such layer") from e
@@ -153,23 +154,6 @@ class PsdImageFile(ImageFile.ImageFile):
     def tell(self):
         # return layer number (0=image, 1..max=layers)
         return self.frame
-
-    def load_prepare(self):
-        # create image memory if necessary
-        if not self.im or self.im.mode != self.mode or self.im.size != self.size:
-            self.im = Image.core.fill(self.mode, self.size, 0)
-        # create palette (optional)
-        if self.mode == "P":
-            Image.Image.load(self)
-
-    def _close__fp(self):
-        try:
-            if self.__fp != self.fp:
-                self.__fp.close()
-        except AttributeError:
-            pass
-        finally:
-            self.__fp = None
 
 
 def _layerinfo(fp, ct_bytes):
@@ -179,13 +163,13 @@ def _layerinfo(fp, ct_bytes):
     def read(size):
         return ImageFile._safe_read(fp, size)
 
-    ct = i16(read(2))
+    ct = si16(read(2))
 
     # sanity check
     if ct_bytes < (abs(ct) * 20):
         raise SyntaxError("Layer block too short for number of layers requested")
 
-    for i in range(abs(ct)):
+    for _ in range(abs(ct)):
 
         # bounding box
         y0 = i32(read(4))
@@ -194,14 +178,13 @@ def _layerinfo(fp, ct_bytes):
         x1 = i32(read(4))
 
         # image info
-        info = []
         mode = []
         ct_types = i16(read(2))
         types = list(range(ct_types))
         if len(types) > 4:
             continue
 
-        for i in types:
+        for _ in types:
             type = i16(read(2))
 
             if type == 65535:
@@ -210,8 +193,7 @@ def _layerinfo(fp, ct_bytes):
                 m = "RGBA"[type]
 
             mode.append(m)
-            size = i32(read(4))
-            info.append((m, size))
+            read(4)  # size
 
         # figure out the image mode
         mode.sort()
@@ -228,26 +210,22 @@ def _layerinfo(fp, ct_bytes):
         read(12)  # filler
         name = ""
         size = i32(read(4))  # length of the extra data field
-        combined = 0
         if size:
             data_end = fp.tell() + size
 
             length = i32(read(4))
             if length:
                 fp.seek(length - 16, io.SEEK_CUR)
-            combined += length + 4
 
             length = i32(read(4))
             if length:
                 fp.seek(length, io.SEEK_CUR)
-            combined += length + 4
 
             length = i8(read(1))
             if length:
                 # Don't know the proper encoding,
                 # Latin-1 should be a good guess
                 name = read(length).decode("latin-1", "replace")
-            combined += length + 1
 
             fp.seek(data_end)
         layers.append((name, mode, (x0, y0, x1, y1)))

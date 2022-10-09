@@ -62,13 +62,12 @@ class MicImageFile(TiffImagePlugin.TiffImageFile):
         if not self.images:
             raise SyntaxError("not an MIC file; no image entries")
 
-        self.__fp = self.fp
         self.frame = None
         self._n_frames = len(self.images)
         self.is_animated = self._n_frames > 1
 
         if len(self.images) > 1:
-            self.category = Image.CONTAINER
+            self._category = Image.CONTAINER
 
         self.seek(0)
 
@@ -88,15 +87,6 @@ class MicImageFile(TiffImagePlugin.TiffImageFile):
 
     def tell(self):
         return self.frame
-
-    def _close__fp(self):
-        try:
-            if self.__fp != self.fp:
-                self.__fp.close()
-        except AttributeError:
-            pass
-        finally:
-            self.__fp = None
 
 
 #

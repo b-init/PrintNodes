@@ -45,6 +45,7 @@ from . import Image, ImageFile, TiffImagePlugin
 from ._binary import i16be as i16
 from ._binary import i32be as i32
 from ._binary import o8
+from ._deprecate import deprecate
 from .JpegPresets import presets
 
 #
@@ -168,11 +169,11 @@ def APP(self, marker):
                 # 1 dpcm = 2.54 dpi
                 dpi *= 2.54
             self.info["dpi"] = dpi, dpi
-        except (KeyError, SyntaxError, ValueError, ZeroDivisionError):
+        except (TypeError, KeyError, SyntaxError, ValueError, ZeroDivisionError):
             # SyntaxError for invalid/unreadable EXIF
             # KeyError for dpi not included
             # ZeroDivisionError for invalid dpi rational value
-            # ValueError for dpi being an invalid float
+            # ValueError or TypeError for dpi being an invalid float
             self.info["dpi"] = 72, 72
 
 
@@ -330,7 +331,7 @@ MARKER = {
 
 def _accept(prefix):
     # Magic number was taken from https://en.wikipedia.org/wiki/JPEG
-    return prefix[0:3] == b"\xFF\xD8\xFF"
+    return prefix[:3] == b"\xFF\xD8\xFF"
 
 
 ##
@@ -401,9 +402,10 @@ class JpegImageFile(ImageFile.ImageFile):
         """
         s = self.fp.read(read_bytes)
 
-        if not s and ImageFile.LOAD_TRUNCATED_IMAGES:
+        if not s and ImageFile.LOAD_TRUNCATED_IMAGES and not hasattr(self, "_ended"):
             # Premature EOF.
             # Pretend file is finished adding EOI marker
+            self._ended = True
             return b"\xFF\xD9"
 
         return s
@@ -443,7 +445,7 @@ class JpegImageFile(ImageFile.ImageFile):
         self.decoderconfig = (scale, 0)
 
         box = (0, 0, original_size[0] / scale, original_size[1] / scale)
-        return (self.mode, box)
+        return self.mode, box
 
     def load_djpeg(self):
 
@@ -481,6 +483,7 @@ class JpegImageFile(ImageFile.ImageFile):
         """
         Returns a dictionary containing the XMP tags.
         Requires defusedxml to be installed.
+
         :returns: XMP tags in a dictionary.
         """
 
@@ -601,11 +604,7 @@ samplings = {
 
 
 def convert_dict_qtables(qtables):
-    warnings.warn(
-        "convert_dict_qtables is deprecated and will be removed in Pillow 10"
-        "(2023-01-02). Conversion is no longer needed.",
-        DeprecationWarning,
-    )
+    deprecate("convert_dict_qtables", 10, action="Conversion is no longer needed")
     return qtables
 
 
@@ -624,6 +623,8 @@ def get_sampling(im):
 
 
 def _save(im, fp, filename):
+    if im.width == 0 or im.height == 0:
+        raise ValueError("cannot write empty image as JPEG")
 
     try:
         rawmode = RAWMODE[im.mode]
