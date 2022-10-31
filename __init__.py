@@ -19,8 +19,8 @@ bl_info = {
     "name" : "PrintNodes",
     "author" : "Binit",
     "description" : "Takes high quality screenshot of a node tree",
-    "blender" : (3, 00, 0),
-    "version" : (1, 1, 5),
+    "blender" : (3, 1, 0),
+    "version" : (1, 2, 0),
     "location" : "Node Editor > Context Menu (Right Click)",
     "warning" : "",
     "category" : "Node"
@@ -54,7 +54,7 @@ def MakeDirectory(): # Manage Directory for saving screenshots
         
         if os.path.isdir(Directory) == False:
             os.mkdir(Directory)
-            bpy.ops.wm
+            
     else:  
         # just use the secondary directory otherwise
         Directory = bpy.context.preferences.addons[__name__].preferences.secondary_save_dir
@@ -131,7 +131,15 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
     temp_name = ''
     temp_grid_level = 0
     forced_cancel = False
+    current_header:bool
+    current_ui:bool
+    current_overlay:bool
 
+
+    def handle_regions(self, node_editor_space:bpy.types.SpaceNodeEditor, show=False):
+        node_editor_space.show_region_header = show
+        node_editor_space.show_region_ui = show
+        # we can also 
 
     def modal(self, context, event): 
         if event.type in {'RIGHTMOUSE', 'ESC'}: # force cancel
@@ -168,12 +176,20 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
     def execute(self, context):
 
         self.temp_grid_level = context.preferences.themes[0].node_editor.grid_levels
+        self.current_header = context.space_data.show_region_header
+        self.current_toolbar = context.space_data.show_region_toolbar
+        self.current_ui = context.space_data.show_region_ui
+        self.current_overlay = context.space_data.overlay.show_context_path
+
         bpy.context.preferences.themes[0].node_editor.grid_levels = 0 # turn gridlines off, trimming empty space doesn't work otherwise
+        context.space_data.overlay.show_context_path = False
+        self.handle_regions(context.space_data)
 
         if self.selection_only:
             nodes = context.selected_nodes # perform within the selected nodes only
         else:  
             nodes = context.space_data.edit_tree.nodes # perform within the whole tree
+
         tree = context.space_data.edit_tree
 
         self.Xmin = self.Xmax = nodes[0].location[0]
@@ -239,6 +255,9 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
 
         # revert all the temporary settings back to original
         context.preferences.themes[0].node_editor.grid_levels = self.temp_grid_level
+        context.space_data.show_region_header = self.current_header
+        context.space_data.show_region_ui = self.current_ui
+        context.space_data.overlay.show_context_path = self.current_overlay
 
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
