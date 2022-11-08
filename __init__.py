@@ -20,7 +20,7 @@ bl_info = {
     "author" : "Binit",
     "description" : "Takes high quality screenshot of a node tree",
     "blender" : (3, 1, 0),
-    "version" : (1, 2, 0),
+    "version" : (1, 1, 6),
     "location" : "Node Editor > Context Menu (Right Click)",
     "warning" : "",
     "category" : "Node"
@@ -176,12 +176,14 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
     def execute(self, context):
 
         self.temp_grid_level = context.preferences.themes[0].node_editor.grid_levels
+        self.temp_scroll_color = tuple(context.preferences.themes[0].user_interface.wcol_scroll.item)
         self.current_header = context.space_data.show_region_header
         self.current_toolbar = context.space_data.show_region_toolbar
         self.current_ui = context.space_data.show_region_ui
         self.current_overlay = context.space_data.overlay.show_context_path
 
         bpy.context.preferences.themes[0].node_editor.grid_levels = 0 # turn gridlines off, trimming empty space doesn't work otherwise
+        bpy.context.preferences.themes[0].user_interface.wcol_scroll.item = (0,0,0,0)
         context.space_data.overlay.show_context_path = False
         self.handle_regions(context.space_data)
 
@@ -255,6 +257,7 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
 
         # revert all the temporary settings back to original
         context.preferences.themes[0].node_editor.grid_levels = self.temp_grid_level
+        context.preferences.themes[0].user_interface.wcol_scroll.item = self.temp_scroll_color
         context.space_data.show_region_header = self.current_header
         context.space_data.show_region_ui = self.current_ui
         context.space_data.overlay.show_context_path = self.current_overlay
