@@ -87,6 +87,8 @@ class PRTND_PT_Preferences(AddonPreferences): # setting up perferences
         size=3,
         subtype='COLOR',
         default=[0.0,0.0,0.0],
+        soft_max=1.0,
+        soft_min=0.0,
     )
 
     disable_auto_crop: BoolProperty(
