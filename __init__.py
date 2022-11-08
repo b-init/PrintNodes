@@ -28,7 +28,7 @@ bl_info = {
 
 import bpy
 from bpy.types import Operator, AddonPreferences, Menu
-from bpy.props import StringProperty, BoolProperty, IntProperty
+from bpy.props import StringProperty, BoolProperty, IntProperty, FloatVectorProperty
 
 import time
 import os
@@ -81,6 +81,14 @@ class PRTND_PT_Preferences(AddonPreferences): # setting up perferences
         default = 30,
         )
 
+    node_outline_color: FloatVectorProperty(
+        name="Node Outline Color",
+        description="Set this to outline of a node in non active/selected state.",
+        size=3,
+        subtype='COLOR',
+        default=[0.0,0.0,0.0],
+    )
+
     disable_auto_crop: BoolProperty(
         name = 'Disable Auto Cropping',
         description = 'Check this if something is not working properly',
@@ -94,6 +102,8 @@ class PRTND_PT_Preferences(AddonPreferences): # setting up perferences
         layout.label(text = "In which case, the Secondary Directory will be used")
         layout.prop(self, "secondary_save_dir")
         layout.prop(self, "force_secondary_dir")
+        layout.separator()
+        layout.prop(self, "node_outline_color")
         layout.separator()
         layout.prop(self, "padding_amount")
         layout.prop(self, "disable_auto_crop")
@@ -117,6 +127,11 @@ def PrintNodesPopUp(message = "", title = "PrintNodes PopUp", icon = ""): # func
 
     bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
 
+def select_nodes(nodes,select = True):
+    for node in nodes:
+        node.select = select
+
+# bpy.ops.node.select_all(action='SELECT')
 
 class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of the whole shot every at every set interval, while not interrupting the rest of blender's functioning (for the most part)
     """Take screenshot of active node tree. Press RightClick or Esc to cancel during process."""
@@ -134,8 +149,9 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
     current_header:bool
     current_ui:bool
     current_overlay:bool
-
-
+    current_wire_select_color:tuple
+    currnet_node_selected:tuple
+    currnet_node_active:tuple
     def handle_regions(self, node_editor_space:bpy.types.SpaceNodeEditor, show=False):
         node_editor_space.show_region_header = show
         node_editor_space.show_region_ui = show
@@ -148,7 +164,6 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
             return {'CANCELLED'}
 
         if event.type == 'TIMER':
-                  
             tree = context.space_data.edit_tree
             view = context.region.view2d
             area = bpy.context.area
@@ -174,16 +189,24 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         return {'PASS_THROUGH'} # pass for next iteration
 
     def execute(self, context):
-
         self.temp_grid_level = context.preferences.themes[0].node_editor.grid_levels
         self.temp_scroll_color = tuple(context.preferences.themes[0].user_interface.wcol_scroll.item)
+        self.current_wire_select_color = tuple(context.preferences.themes[0].node_editor.wire_select)
+        self.currnet_node_selected = tuple(context.preferences.themes[0].node_editor.node_selected)
+        self.currnet_node_active = tuple(context.preferences.themes[0].node_editor.node_active)
         self.current_header = context.space_data.show_region_header
         self.current_toolbar = context.space_data.show_region_toolbar
         self.current_ui = context.space_data.show_region_ui
         self.current_overlay = context.space_data.overlay.show_context_path
 
         bpy.context.preferences.themes[0].node_editor.grid_levels = 0 # turn gridlines off, trimming empty space doesn't work otherwise
-        bpy.context.preferences.themes[0].user_interface.wcol_scroll.item = (0,0,0,0)
+        bpy.context.preferences.themes[0].user_interface.wcol_scroll.item = (0, 0, 0, 0)
+        bpy.context.preferences.themes[0].node_editor.wire_select = (0, 0, 0, 0)
+
+        pref = bpy.context.preferences.addons[__name__].preferences
+        bpy.context.preferences.themes[0].node_editor.node_selected = pref.node_outline_color
+        bpy.context.preferences.themes[0].node_editor.node_active = pref.node_outline_color
+
         context.space_data.overlay.show_context_path = False
         self.handle_regions(context.space_data)
 
@@ -238,7 +261,8 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         # Remove reroute node from graph, so that it does not appear in the final image
         tree.nodes.remove(node)
 
-        
+        # Selecting nodes to avoid the noodle dimming.
+        select_nodes(nodes,select=True)
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.02, window=context.window) # add timer to begin with, for the `modal` process
         wm.modal_handler_add(self)
@@ -258,6 +282,9 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         # revert all the temporary settings back to original
         context.preferences.themes[0].node_editor.grid_levels = self.temp_grid_level
         context.preferences.themes[0].user_interface.wcol_scroll.item = self.temp_scroll_color
+        context.preferences.themes[0].node_editor.wire_select = self.current_wire_select_color
+        context.preferences.themes[0].node_editor.node_selected = self.currnet_node_selected
+        context.preferences.themes[0].node_editor.node_active = self.currnet_node_active
         context.space_data.show_region_header = self.current_header
         context.space_data.show_region_ui = self.current_ui
         context.space_data.overlay.show_context_path = self.current_overlay
