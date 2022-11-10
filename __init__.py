@@ -133,8 +133,6 @@ def select_nodes(nodes,select = True):
     for current_node in nodes:
         current_node.select = select
 
-# bpy.ops.node.select_all(action='SELECT')
-
 class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of the whole shot every at every set interval, while not interrupting the rest of blender's functioning (for the most part)
     """Take screenshot of active node tree. Press RightClick or Esc to cancel during process."""
     bl_idname = "prtnd.modal_ss_timer"
@@ -142,22 +140,78 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
 
     selection_only: BoolProperty(default = False)
 
-    _timer = None
+    _timer:bpy.types.Timer = None
     Xmin = Ymin = Xmax = Ymax = 0
     ix = iy = 0
-    temp_name = ''
-    temp_grid_level = 0
-    forced_cancel = False
+    current_grid_level:int = 0
+    forced_cancel:bool = False
     current_header:bool
     current_ui:bool
     current_overlay:bool
     current_wire_select_color:tuple
     currnet_node_selected:tuple
     currnet_node_active:tuple
-    def handle_regions(self, node_editor_space:bpy.types.SpaceNodeEditor, show=False):
-        node_editor_space.show_region_header = show
-        node_editor_space.show_region_ui = show
-        # we can also 
+
+    def store_current_settings(self, context):
+        self.current_grid_level = context.preferences.themes[0].node_editor.grid_levels
+        self.current_scroll_color = tuple(context.preferences.themes[0].user_interface.wcol_scroll.item)
+        self.current_wire_select_color = tuple(context.preferences.themes[0].node_editor.wire_select)
+        self.currnet_node_selected = tuple(context.preferences.themes[0].node_editor.node_selected)
+        self.currnet_node_active = tuple(context.preferences.themes[0].node_editor.node_active)
+        self.current_header = context.space_data.show_region_header
+        self.current_toolbar = context.space_data.show_region_toolbar
+        self.current_ui = context.space_data.show_region_ui
+        self.current_overlay = context.space_data.overlay.show_context_path
+
+    def restore_settings(self, context):
+        context.preferences.themes[0].node_editor.grid_levels = self.current_grid_level
+        context.preferences.themes[0].user_interface.wcol_scroll.item = self.current_scroll_color
+        context.preferences.themes[0].node_editor.wire_select = self.current_wire_select_color
+        context.preferences.themes[0].node_editor.node_selected = self.currnet_node_selected
+        context.preferences.themes[0].node_editor.node_active = self.currnet_node_active
+        context.space_data.show_region_header = self.current_header
+        context.space_data.show_region_ui = self.current_ui
+        context.space_data.overlay.show_context_path = self.current_overlay
+
+    def set_settings_for_screenshot(self, context):
+        pref = bpy.context.preferences.addons[__name__].preferences
+
+        context.preferences.themes[0].node_editor.grid_levels = 0 # turn gridlines off, trimming empty space doesn't work otherwise
+        context.preferences.themes[0].user_interface.wcol_scroll.item = (0, 0, 0, 0)
+        context.preferences.themes[0].node_editor.wire_select = (0, 0, 0, 0)
+        context.preferences.themes[0].node_editor.node_selected = pref.node_outline_color
+        context.preferences.themes[0].node_editor.node_active = pref.node_outline_color
+        context.space_data.overlay.show_context_path = False
+        context.space_data.show_region_header = False
+        context.space_data.show_region_ui = False
+
+    def find_min_max_coords(self, nodes)->tuple[float]:
+        '''find the min and max coordinates of given nodes.
+        Returns: Xmin, Ymin, Xmax, Ymax'''
+        Xmin:float
+        Xmax:float
+        Ymin:float
+        Ymax:float
+        Xmin = Xmax = nodes[0].location[0]
+        Ymin = Ymax = nodes[0].location[1]
+    
+
+        for i in range(len(nodes)):
+            loc = nodes[i].location
+            locX = loc[0]
+            locY = loc[1]
+            
+            if locX < Xmin:
+                Xmin = locX
+            if locY < Ymin:
+                Ymin = locY
+
+            if locX > Xmax:
+                Xmax = locX
+            if locY > Ymax:
+                Ymax = locY
+        
+        return Xmin, Ymin, Xmax, Ymax
 
     def modal(self, context, event): 
         if event.type in {'RIGHTMOUSE', 'ESC'}: # force cancel
@@ -191,59 +245,22 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         return {'PASS_THROUGH'} # pass for next iteration
 
     def execute(self, context):
-        self.temp_grid_level = context.preferences.themes[0].node_editor.grid_levels
-        self.temp_scroll_color = tuple(context.preferences.themes[0].user_interface.wcol_scroll.item)
-        self.current_wire_select_color = tuple(context.preferences.themes[0].node_editor.wire_select)
-        self.currnet_node_selected = tuple(context.preferences.themes[0].node_editor.node_selected)
-        self.currnet_node_active = tuple(context.preferences.themes[0].node_editor.node_active)
-        self.current_header = context.space_data.show_region_header
-        self.current_toolbar = context.space_data.show_region_toolbar
-        self.current_ui = context.space_data.show_region_ui
-        self.current_overlay = context.space_data.overlay.show_context_path
-
-        bpy.context.preferences.themes[0].node_editor.grid_levels = 0 # turn gridlines off, trimming empty space doesn't work otherwise
-        bpy.context.preferences.themes[0].user_interface.wcol_scroll.item = (0, 0, 0, 0)
-        bpy.context.preferences.themes[0].node_editor.wire_select = (0, 0, 0, 0)
-
-        pref = bpy.context.preferences.addons[__name__].preferences
-        bpy.context.preferences.themes[0].node_editor.node_selected = pref.node_outline_color
-        bpy.context.preferences.themes[0].node_editor.node_active = pref.node_outline_color
-
-        context.space_data.overlay.show_context_path = False
-        self.handle_regions(context.space_data)
+        self.store_current_settings(context)
+        self.set_settings_for_screenshot(context)
 
         if self.selection_only:
             nodes = context.selected_nodes # perform within the selected nodes only
         else:  
             nodes = context.space_data.edit_tree.nodes # perform within the whole tree
 
+
+        self.Xmin, self.Ymin, self.Xmax, self.Ymax = self.find_min_max_coords(nodes)
         tree = context.space_data.edit_tree
-
-        self.Xmin = self.Xmax = nodes[0].location[0]
-        self.Ymin = self.Ymax = nodes[0].location[1]
-    
-
-        for i in range(len(nodes)):
-            loc = nodes[i].location
-            locX = loc[0]
-            locY = loc[1]
-            
-            if locX < self.Xmin:
-                self.Xmin = locX
-            if locY < self.Ymin:
-                self.Ymin = locY
-
-            if locX > self.Xmax:
-                self.Xmax = locX
-            if locY > self.Ymax:
-                self.Ymax = locY
 
         # co-ords from node.location and tree.view_center are apparently not the same (you could say they don't co-ordinate, haha ha...) so I have to make sure I'm using the right ones 
         node = tree.nodes.new("NodeReroute")
         node.location = self.Xmax, self.Ymax
         select_nodes(nodes,select=False)
-        # for current_node in nodes:
-        #     current_node.select = False
         node.select = True
         bpy.ops.wm.redraw_timer(iterations=1)
         bpy.ops.node.view_selected()
@@ -254,7 +271,7 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
 
         node = tree.nodes.new("NodeReroute")
         node.location = self.Xmin, self.Ymin
-        select_nodes(nodes,select=False)
+        select_nodes(nodes,select=False) # This deselect operation might be redundant because of above operation. Need to check futher.
         node.select = True
         bpy.ops.wm.redraw_timer(iterations=1)
         bpy.ops.node.view_selected() # also align view to the (bottom-left) corner node. As an initial point for the screenshotting process
@@ -272,7 +289,7 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         return {'RUNNING_MODAL'}
 
     def cancel(self, context):
-
+        
         if self.forced_cancel: 
             PrintNodesPopUp(message = "Process Force Cancelled", icon = "CANCEL")
 
@@ -282,21 +299,15 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
             PrintNodesPopUp(message = "Screenshot Saved Successfully", icon = "CHECKMARK")
 
         # revert all the temporary settings back to original
-        context.preferences.themes[0].node_editor.grid_levels = self.temp_grid_level
-        context.preferences.themes[0].user_interface.wcol_scroll.item = self.temp_scroll_color
-        context.preferences.themes[0].node_editor.wire_select = self.current_wire_select_color
-        context.preferences.themes[0].node_editor.node_selected = self.currnet_node_selected
-        context.preferences.themes[0].node_editor.node_active = self.currnet_node_active
-        context.space_data.show_region_header = self.current_header
-        context.space_data.show_region_ui = self.current_ui
-        context.space_data.overlay.show_context_path = self.current_overlay
+        self.restore_settings(context)
 
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
 
 
-def TrimImage(img): # function to trim out empty space from the edges, leaving a padding (as defined in preferences)
-
+def TrimImage(img:Image.Image):
+    '''function to trim out empty space from the edges, leaving a padding (as defined in preferences)
+    :rtype: An ~PIL.Image.Image object.'''
     bg_clr = tuple(bpy.context.preferences.themes[0].node_editor.space.back * 255) # get the background color of the shader editor from themes and map from 0-1 to 0-255 for PIL operations
     bg_clr = tuple(map(lambda i: int(i), bg_clr)) # convert float tuple to int tuple (as Image.new(color) expectes Int tuple)
 
@@ -321,7 +332,7 @@ def TrimImage(img): # function to trim out empty space from the edges, leaving a
 
 
 def StitchTiles(tile_width, tile_height, num_x, num_y): # function to stitch multiple tiles to one single image
-
+    '''function to stitch multiple tiles to one single image'''
     folder_path = MakeDirectory()
 
     out_canvas = Image.new('RGB', (tile_width * num_x, tile_height * num_y))
