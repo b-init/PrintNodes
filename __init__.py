@@ -213,7 +213,8 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         
         return Xmin, Ymin, Xmax, Ymax
 
-    def modal(self, context, event): 
+    def modal(self, context, event):
+        context.window.cursor_set("STOP")
         if event.type in {'RIGHTMOUSE', 'ESC'}: # force cancel
             self.forced_cancel = True
             self.cancel(context)
@@ -245,6 +246,7 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         return {'PASS_THROUGH'} # pass for next iteration
 
     def execute(self, context):
+        context.window.cursor_set("STOP")
         self.store_current_settings(context)
         self.set_settings_for_screenshot(context)
 
@@ -303,7 +305,7 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
 
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
-
+        context.window.cursor_set("DEFAULT")
 
 def TrimImage(img:Image.Image):
     '''function to trim out empty space from the edges, leaving a padding (as defined in preferences)
