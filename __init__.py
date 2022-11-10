@@ -20,7 +20,7 @@ bl_info = {
     "author" : "Binit",
     "description" : "Takes high quality screenshot of a node tree",
     "blender" : (3, 1, 0),
-    "version" : (1, 1, 6),
+    "version" : (1, 1, 7),
     "location" : "Node Editor > Context Menu (Right Click)",
     "warning" : "",
     "category" : "Node"
@@ -289,7 +289,7 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         return {'RUNNING_MODAL'}
 
     def cancel(self, context):
-        
+
         if self.forced_cancel: 
             PrintNodesPopUp(message = "Process Force Cancelled", icon = "CANCEL")
 
