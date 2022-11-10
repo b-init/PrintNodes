@@ -130,8 +130,8 @@ def PrintNodesPopUp(message = "", title = "PrintNodes PopUp", icon = ""): # func
     bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
 
 def select_nodes(nodes,select = True):
-    for node in nodes:
-        node.select = select
+    for current_node in nodes:
+        current_node.select = select
 
 # bpy.ops.node.select_all(action='SELECT')
 
@@ -241,8 +241,9 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
         # co-ords from node.location and tree.view_center are apparently not the same (you could say they don't co-ordinate, haha ha...) so I have to make sure I'm using the right ones 
         node = tree.nodes.new("NodeReroute")
         node.location = self.Xmax, self.Ymax
-        for current_node in nodes:
-            current_node.select = False
+        select_nodes(nodes,select=False)
+        # for current_node in nodes:
+        #     current_node.select = False
         node.select = True
         bpy.ops.wm.redraw_timer(iterations=1)
         bpy.ops.node.view_selected()
@@ -253,8 +254,7 @@ class PRTND_OT_ModalScreenshotTimer(Operator): # modal operator to take parts of
 
         node = tree.nodes.new("NodeReroute")
         node.location = self.Xmin, self.Ymin
-        for current_node in nodes:
-            current_node.select = False
+        select_nodes(nodes,select=False)
         node.select = True
         bpy.ops.wm.redraw_timer(iterations=1)
         bpy.ops.node.view_selected() # also align view to the (bottom-left) corner node. As an initial point for the screenshotting process
