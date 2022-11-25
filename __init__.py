@@ -20,7 +20,7 @@ bl_info = {
     "author" : "Binit",
     "description" : "Takes high quality screenshot of a node tree",
     "blender" : (3, 1, 0),
-    "version" : (1, 1, 8),
+    "version" : (1, 2, 0),
     "location" : "Node Editor > Context Menu (Right Click)",
     "warning" : "",
     "category" : "Node"
